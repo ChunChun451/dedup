@@ -192,6 +192,22 @@ because `snprintf(…, rng.Below(…), rng.Below(…))` evaluates its arguments 
 0.5% as single bytes would touch nearly every chunk. Measured zstd-1 ratios: random 1.00, text 2.76, structured 3.52,
 mixed 1.96. SPEC's "~3:1" for D3 was corrected to the measured ~2:1 (a description, not a target).
 
+## D23 — Datasets: pinned sources, release builds for D2, one digest per file or tree
+**Decision:** `scripts/datasets/sources.txt` pins every download: 13 kernel tarballs (sha256 from kernel.org's
+`sha256sums.asc`) and 10 Debian 13 genericcloud **release** builds 2026-01-12 … 2026-05-01 (sha512 from each build's
+`SHA512SUMS`). D2 downloads the 226 MB `.tar.xz` per build, not the 3 GiB `.raw`, and extracts `disk.raw` sparse.
+Layout: `data/d1/linux-6.X`, `data/d2/<build>/disk.raw`, `data/d3/v{0,1,2}/f0` (mixed seed 3, 16 GiB; mutate seeds
+31, 32), `data/d4/big0` (random seed 4, 20 GiB) + `big1` (seed 5, 12 GiB), `data/d1-small/linux-6.12`,
+`data/d3-small/f0` (mixed seed 3, 4 GiB), `data/d4-small/f0` (random seed 44, 4 GiB). `scripts/datasets/manifest.txt`
+holds one SHA-256 per dataset file or tree (`treehash.py`: sorted paths, type, permission bits, size or link target,
+file hash; no owners or times). It is recorded once with `verify.sh --record` and committed.
+**Reason:** Debian deletes daily images after a few months: the oldest daily on 2026-10-06 is from June 2026. Release
+builds have been kept since August 2025, so D2 stays reproducible until the end of the project. Consecutive builds
+two weeks apart are realistic VM-image updates. The `.tar.xz` route downloads 2.3 GB instead of 32 GB. One digest per
+tree, instead of one line per file (~1.2 M lines for D1), keeps the manifest small enough to commit. Leaving out owners
+and times makes the digest identical on any machine. D4 is split 20 + 12 GiB so that W15.3 has a single file larger than
+RAM (`big0`). Measured: verifying the three small sets takes ~1 min, mostly opening D1-small's ~90k files (36 s).
+
 ---
 
 ## G1 — Targets recalibrated to the measured limits (W01, 2026-10-06)

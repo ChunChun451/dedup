@@ -1,0 +1,26 @@
+# Pinned downloads for datasets D1 and D2 (SPEC.md section 5). Format: <algorithm> <hash> <url>
+# D1: Linux kernel release tarballs; hashes from https://cdn.kernel.org/pub/linux/kernel/v6.x/sha256sums.asc
+sha256 5c2443a5538de52688efb55c27ab0539c1f5eb58c0cfd16a2b9fbb08fd81788e https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.0.tar.xz
+sha256 2ca1f17051a430f6fed1196e4952717507171acfd97d96577212502703b25deb https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.1.tar.xz
+sha256 74862fa8ab40edae85bb3385c0b71fe103288bce518526d63197800b3cbdecb1 https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.2.tar.xz
+sha256 ba3491f5ed6bd270a370c440434e3d69085fcdd528922fa01e73d7657db73b1e https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.3.tar.xz
+sha256 8fa0588f0c2ceca44cac77a0e39ba48c9f00a6b9dc69761c02a5d3efac8da7f3 https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.4.tar.xz
+sha256 7a574bbc20802ea76b52ca7faf07267f72045e861b18915c5272a98c27abf884 https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.5.tar.xz
+sha256 d926a06c63dd8ac7df3f86ee1ffc2ce2a3b81a2d168484e76b5b389aba8e56d0 https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.tar.xz
+sha256 ef31144a2576d080d8c31698e83ec9f66bf97c677fa2aaf0d5bbb9f3345b1069 https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.7.tar.xz
+sha256 c969dea4e8bb6be991bbf7c010ba0e0a5643a3a8d8fb0a2aaa053406f1e965f3 https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.8.tar.xz
+sha256 24fa01fb989c7a3e28453f117799168713766e119c5381dac30115f18f268149 https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.9.tar.xz
+sha256 774698422ee54c5f1e704456f37c65c06b51b4e9a8b0866f34580d86fef8e226 https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.10.tar.xz
+sha256 55d2c6c025ebc27810c748d66325dd5bc601e8d32f8581d9e77673529bdacb2e https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.11.tar.xz
+sha256 b1a2562be56e42afb3f8489d4c2a7ac472ac23098f1ef1c1e40da601f54625eb https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.tar.xz
+# D2: Debian 13 genericcloud release builds (kept long-term, unlike dailies); hashes from each build's SHA512SUMS
+sha512 4d59f84d70feca8ba171f38e2cce9705fbc6de277901947b712cca98ba755ac3be14cfe1322b78b326ebd741e12d926fd9d546f10c7827d7a9dfa71430929bda https://cloud.debian.org/images/cloud/trixie/20260112-2355/debian-13-genericcloud-amd64-20260112-2355.tar.xz
+sha512 5c2998439762be55bcb63940b118e3bf45924c740a529195d6f4cb6dbd306905469d68efc2189dd831ebba5c1c1e56d9370e6eb2064eff88d41f6e5a2b6737e6 https://cloud.debian.org/images/cloud/trixie/20260129-2372/debian-13-genericcloud-amd64-20260129-2372.tar.xz
+sha512 18b434f76cbeb82293c3dc6c50dcfd9eed4f3296e0ef5a262ece19cfe699181a3c8bb16683d3d607c0cc86dd624b371d272560571d60af408ddc70606c71e3b2 https://cloud.debian.org/images/cloud/trixie/20260210-2384/debian-13-genericcloud-amd64-20260210-2384.tar.xz
+sha512 6127ed528ba1a26ac4fb3beb126c9180f070984141630657efb1be8f2a0c20b167737952884f0783558ec610cfbd59058e7ed529b3d2e4438c88fb2b88b3d815 https://cloud.debian.org/images/cloud/trixie/20260220-2394/debian-13-genericcloud-amd64-20260220-2394.tar.xz
+sha512 98a502bfbd7006ef550f02663d8b7dd1e9568bd789b4168edee6bb0546b8fa70c75c29cb978291e83121c82e1fbcef1336e4ffbe22b9a9071a97752f75536acd https://cloud.debian.org/images/cloud/trixie/20260313-2415/debian-13-genericcloud-amd64-20260313-2415.tar.xz
+sha512 bdfe517962870678fcf9b38e989d51a4b730616f295a9a0f75d72aaf4385b60cc472b9f235727ef9981a055ce941cc76ff75dac7fdccddf3263673631006330a https://cloud.debian.org/images/cloud/trixie/20260316-2418/debian-13-genericcloud-amd64-20260316-2418.tar.xz
+sha512 5d4e95412a38a9da735add16e51423732607dd806de1ffe6cbfdbb699537f537f84ec2d0c23e8d5c96e31b7268054b20daa4eebbec111243d4bf7378f97236f1 https://cloud.debian.org/images/cloud/trixie/20260327-2429/debian-13-genericcloud-amd64-20260327-2429.tar.xz
+sha512 910bcf5226323ac7467b2ca196136cb78ff154368e30537bcd072e274b802d305126b096eb1b6c76f33bcf6a41979db6724112ffb0fbd5bb5b9479150bd1a4f5 https://cloud.debian.org/images/cloud/trixie/20260402-2435/debian-13-genericcloud-amd64-20260402-2435.tar.xz
+sha512 20cfcd1e11e10b1f9c6b4c1abfdb869bd5a8ede22e1d24e8aa14f207dfb13cd1ed0d91cd2bf02b87779e24b2bcd361c37e4a261872713a8a15e610e2e9747172 https://cloud.debian.org/images/cloud/trixie/20260413-2447/debian-13-genericcloud-amd64-20260413-2447.tar.xz
+sha512 b7a7333c785880644f9f5c11b5286f2a7ffcabc4001b98d22dcceaca91ef6bc445c7ea083b6c77b6d3b5a95976279059ec28e99fa234e632663bfab61d0dd7f9 https://cloud.debian.org/images/cloud/trixie/20260501-2465/debian-13-genericcloud-amd64-20260501-2465.tar.xz

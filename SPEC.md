@@ -76,11 +76,13 @@ data are bound by the disk's write speed `W` (~1.8 GB/s), for every tool.
 | ID | Content | Size | Why |
 |---|---|---|---|
 | D1 | Linux kernel trees v6.0…v6.12 (13 trees, cdn.kernel.org tarballs) | ~17 GB, ~1M files | Small files, many versions |
-| D2 | 10 Debian 13 `genericcloud` raw daily images | ~20 GB | Large files, VM-image dedup |
+| D2 | 10 Debian 13 `genericcloud` release builds 2026-01-12 … 2026-05-01 (`disk.raw`, 3 GiB each, sparse; pinned SHA-512) | 30 GiB logical | Large files, VM-image dedup |
 | D3 | `dedup-gen` mixed (50% text-like, 25% structured, 25% random; zstd-1 ratio 1.96:1), base + 2 versions at 0.5% edits | 3 × 16 GiB | Controlled shift resistance and compressibility |
 | D4 | `dedup-gen` random (ChaCha20, seed 4) | 32 GiB | Incompressible, I/O-bound, defeats caches |
 | *-small | D1 one tree; D3/D4 at 4 GiB | ≤ 4 GiB | Warm-cache runs |
-Only scripts and sha256 manifests are in git. At most one competitor repo exists at a time.
+Only scripts and digests are in git: `scripts/datasets/sources.txt` (pinned downloads), `scripts/datasets/manifest.txt`
+(digest of every dataset file or tree). `scripts/datasets/make.sh small|all` builds, `verify.sh small|all` checks.
+At most one competitor repo exists at a time.
 
 ## 6. How we measure speed fairly
 1. **Same conditions**: same machine and WSL instance, source and repo on the same ext4 filesystem, AC power, Windows
