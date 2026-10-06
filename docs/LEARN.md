@@ -60,3 +60,14 @@ it so we measure the disk, not RAM. Measured here: reads about **6 GB/s**, write
 A normal `read()` of a file that is already cached copies the bytes from Linux's cache into our program's buffer.
 That copy costs RAM bandwidth too. Measured here: 8 readers copy 9–13 GB/s out of the cache, before doing any work.
 So a "warm" backup cannot go faster than that unless it avoids the copy (for example with `mmap`).
+
+## Free page reporting (WSL)
+Linux in WSL runs inside a virtual machine. When Linux frees memory, WSL tells Windows "I don't need these pages",
+and Windows takes them back for other programs. That is good for your laptop. But when Linux needs that memory again,
+Windows must hand it back page by page, and that costs time. Measured here: copying a 4 GiB file into memory Linux
+already holds took 1.5 s; copying it into memory that had been handed back to Windows took 6.4–10.2 s. Backup tools
+use a lot of fresh memory for file caching, so this makes every tool slower and the timings jumpy.
+
+## Unspecified evaluation order (C++)
+In `f(a(), b())`, C++ does not say whether `a()` or `b()` runs first. GCC often runs `b()` first, Clang `a()`. If both
+draw random numbers, the two compilers produce different data. Fix: give each call its own line, which fixes the order.

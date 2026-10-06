@@ -36,6 +36,18 @@ One entry per session, newest first. Each entry says which roadmap steps were fi
   growth and takes the median of 10 warm reads. The first schema-2 baseline was rejected by the new validator
   (probe 8 GiB passed, then the 32 GiB write fell to 1.0 GB/s), which led to the stronger 16 GiB probe.
 
+- G1b (user correction): warm ceiling = max(read, write) time, not the sum; io_ceiling gets two modes.
+- W02.1 done: `dedup-gen` (D22). Found and fixed a C++ argument-evaluation-order bug: GCC and Clang produced different
+  structured/mixed data; `scripts/gen-crosscheck.sh` now guards it. Measured zstd-1 ratios: mixed 1.96:1 (SPEC said ~3:1).
+- W02.2 done: dataset scripts (D23); D2 uses Debian release builds because dailies are deleted. Small sets built.
+- W02.3 done: harness `bench/e2e/run.py` (D24); `scripts/check W02.3` PASS (6/6 cells, restore verified).
+- W02.4 done: `io_ceiling` (D25); preallocating the write file fixed a 2-3x understated write speed.
+- **Open issue (blocks trustworthy numbers):** WSL "free page reporting" is on (kernel log: "Free page reporting
+  enabled", order 5). Memory Linux frees is handed back to Windows; using it again costs ~1-2 s of kernel time per GiB.
+  Measured: copying 4 GiB into new memory 6.4-10.2 s, overwriting in place 1.5 s. The cp smoke cells varied 7.5-25 s.
+  WSL 3.0.1 has no setting to turn it off; root can raise `page_reporting_order` (max 10 = only 4 MiB blocks).
+  Test: `bench/hw/page_reporting_test.sh`. Needs the user's sudo to try.
+
 ## Notes for later steps
 - **W11.1:** measure BLAKE3 at exactly 16 KiB inputs (benchmark name `Blake3/16K`, matching the roadmap filter; today it is
   called `Blake3/16384`), and report which SIMD path is used (`blake3_simd_degree()`: 16 = AVX-512, 8 = AVX2, 4 = SSE4.1)
