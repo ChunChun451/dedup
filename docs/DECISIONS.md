@@ -148,6 +148,21 @@ The 1.5× bar is the user's rule: a smaller gain isn't worth the extra code to m
 virtual disk give space back to C: when repos are deleted, which matters with a 170 GB budget on a drive with 269 GB free.
 Disabling automatic memory reclaim stops WSL dropping the page cache in the middle of a warm-cache benchmark.
 
+## D20b — No sparse VHD; reclaim space with `wsl --manage Ubuntu --compact` (replaces the sparseVhd part of D20)
+**Decision:** `.wslconfig` keeps `memory=12GB`, `processors=16`, `swap=4GB` under `[wsl2]` and
+`autoMemoryReclaim=disabled` under `[experimental]`, but does **not** set `sparseVhd`. After deleting large data
+(datasets, benchmark repos), run in PowerShell: `wsl --shutdown`, then `wsl --manage Ubuntu --compact`.
+**Reason:** checked on this machine (WSL 3.0.1, 2026-10-06):
+- The WSL binaries read exactly `wsl2.memory`, `wsl2.processors`, `wsl2.swap`, `experimental.autoMemoryReclaim`,
+  `experimental.sparseVhd`, so the section names above are right.
+- `sparseVhd` only affects *newly created* disks, never the existing Ubuntu disk (`ext4.vhdx`, `fsutil` says NOT sparse).
+- WSL 3.0.1 contains the message "Sparse VHD support is currently disabled due to potential data corruption".
+  Forcing it needs `wsl --manage Ubuntu --set-sparse true --allow-unsafe`. Corruption of `ext4.vhdx` was reported on
+  sparse disks (microsoft/WSL#10609). Losing the disk that holds all datasets and results is not worth automatic space return.
+- Safe alternative: Linux mounts `/` with `discard`, so deleted blocks are already reported to the virtual disk, and
+  `--compact` (calls Windows `CompactVirtualDisk`) then shrinks the file. That is manual, but safe. Revisit when a
+  stable WSL release supports sparse disks again (3.0.2 pre-release re-adds them as experimental).
+
 ---
 
 ## (pending) G1 — Hardware recalibration (W01)
