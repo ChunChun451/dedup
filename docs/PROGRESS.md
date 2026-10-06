@@ -27,7 +27,14 @@ One entry per session, newest first. Each entry says which roadmap steps were fi
   Bugs found while building it: the compiler deleted membw's reads (fixed with a barrier); fio empties the page cache
   before each job unless `--invalidate=0` (fixed). Huge pages make no difference to RAM bandwidth (23.3 vs 23.0 GB/s).
   The WSL disk file `ext4.vhdx` grew from 2.9 GB to 40 GB; ext4 reuses that space for the datasets, so no compaction now.
-- Next: W01 buffer session = gate **G1**. Several SPEC targets are above these ceilings (see the session summary).
+- Gate G1 (W01 buffer), at the user's request first: target-vs-limit table, write-speed investigation (per-second logs,
+  Windows NVMe counters, native Windows write), 10× warm re-reads, C: free-space recheck. Findings and the table are in
+  DECISIONS.md G1; raw numbers in results/hw/g1-investigation.json. SPEC.md v1.1: P1 split into P1a/P1b (0.85 × M1),
+  P3a relative (0.7 × warm re-read, not lowered), P5a/P9 capped by the measured write limit (D4-small: 1.38 GB/s),
+  no flush file, disk-state rules (§6.12: session probe + Windows counters, no per-cell probe).
+- `bench/hw/run.py` now rests the disk, probes with 16 GiB until fast, logs per-second write speed, records virtual-disk
+  growth and takes the median of 10 warm reads. The first schema-2 baseline was rejected by the new validator
+  (probe 8 GiB passed, then the 32 GiB write fell to 1.0 GB/s), which led to the stronger 16 GiB probe.
 
 ## Notes for later steps
 - **W11.1:** measure BLAKE3 at exactly 16 KiB inputs (benchmark name `Blake3/16K`, matching the roadmap filter; today it is

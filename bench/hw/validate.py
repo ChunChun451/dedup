@@ -18,7 +18,7 @@ def main():
         if not cond:
             errors.append(msg)
 
-    need(b.get("schema") == 1, "schema must be 1")
+    need(b.get("schema") == 2, "schema must be 2 (re-run bench/hw/run.sh)")
     c = b.get("ceilings", {})
     for key, lo, hi in [("R_gbps", 0.2, 15), ("W_gbps", 0.2, 15), ("M1_gbps", 3, 150),
                         ("M16_gbps", 3, 150), ("warm_read_8_gbps", 0.5, 150)]:
@@ -33,6 +33,16 @@ def main():
         j = d.get(side, {})
         need(j.get("error") == 0, f"disk.{side} reported an fio error")
         need(j.get("io_bytes", 0) >= d.get("file_gib", 0) << 30, f"disk.{side} moved fewer bytes than the file size")
+
+    g = d.get("vhdx_growth_gb")
+    need(g is not None and g < 1.0, f"virtual disk grew by {g} GB during the write test; run again (DECISIONS.md G1)")
+    probe = d.get("write_probes_gbps", [[0, 0]])[-1]
+    need(isinstance(probe, list) and min(probe) >= 1.5,
+         f"last write probe must show the fast write state (average and tail >= 1.5 GB/s), got {probe}")
+    ps = d.get("seq_write", {}).get("per_second_gbps", {})
+    need(ps.get("median", 0) >= 1.5,
+         f"the 32 GiB write must stay in the fast state (per-second median >= 1.5 GB/s), got {ps.get('median')}")
+    need(b.get("warm_read", {}).get("readers_8", {}).get("runs", 0) >= 10, "warm read needs >= 10 runs")
 
     h = b.get("host_cache", {})
     need(isinstance(h.get("host_caches"), bool), "host_cache.host_caches must be true/false")

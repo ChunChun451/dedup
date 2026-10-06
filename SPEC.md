@@ -1,4 +1,4 @@
-# dedup — Specification v1.0 (2026-10-06)
+# dedup — Specification v1.1 (2026-10-06, revised once at gate G1; frozen from here)
 
 ## 1. What we build
 1. **simdcdc** — a standalone chunking library: SeqCDC (scalar/AVX2/AVX-512), FastCDC (reference + fast
@@ -38,25 +38,35 @@ with the reason in `docs/DECISIONS.md`. After that they are frozen. `bench/e2e/c
 ### 4.2 Performance (16 KiB average, compression + encryption on, unless stated otherwise)
 | ID | Criterion | Target |
 |---|---|---|
-| P1 | SeqCDC AVX-512, 1 core, 1 GiB in-memory D3 buffer | ≥ 20 GB/s (AVX2 ≥ 12 GB/s) |
+| P1a | SeqCDC, 1 core, D3 data in a 1 MiB buffer that stays in L2 cache (pure chunking speed) | AVX-512 ≥ 20 GB/s, AVX2 ≥ 12 GB/s |
+| P1b | SeqCDC AVX-512, 1 core, 1 GiB D3 buffer read from RAM (reported together with P1a) | ≥ 0.85 × `M1` |
 | P2 | Fused chunk+hash, 16 threads, in memory | ≥ 15 GB/s |
-| P3a | Full pipeline, warm, null store, all-duplicate (files cache off) | ≥ 10 GB/s |
+| P3a | Full pipeline, warm, null store, all-duplicate (files cache off) | ≥ 0.7 × warm re-read speed (`warm_read_8` median, measured in the same session) |
 | P3b | Same, unique incompressible (D4-small) | ≥ 5 GB/s |
 | P3c | Same, unique compressible (D3-small, ~3:1) | ≥ 2.5 GB/s |
 | P4a | Cold, real repo on the same disk, first backup D2/D4 | time ≤ 1.15 × `io_ceiling` time |
 | P4b | Cold, unchanged re-backup with files cache off | time ≤ 1.10 × read-only ceiling time |
-| P5a | Warm first backup vs fastest competitor (defaults), every dataset | ≥ 3× its throughput |
+| P5a | Warm first backup vs fastest competitor (defaults), every dataset | ≥ min(3 × fastest competitor, 0.87 × warm ceiling throughput) |
 | P5b | Cold first backup | ≥ min(2 × fastest competitor, 0.87 × ceiling throughput) |
 | P5c | Cold restore | ≥ min(2 × fastest competitor, 0.85 × `W`) |
 | P5d | Unchanged incremental, files cache on | wall time ≤ fastest competitor |
 | P6 | Repo size, matched compression, D1/D2/D3 | ≤ smallest competitor. D4 ≤ 1.01 × input |
 | P7 | Peak RSS during backup | ≤ 1.5 GiB + 64 B × unique chunks |
 | P8 | SeqCDC saved bytes vs FastCDC at 16 KiB on D1–D3 | within 3% relative, otherwise G2 switches the default |
-| P9 | **Same chunk size (1 MiB avg), warm first backup, vs fastest competitor in the same-size config** | ≥ 3× its throughput (pure code speed) |
+| P9 | **Same chunk size (1 MiB avg), warm first backup, vs fastest competitor in the same-size config** | ≥ min(3 × fastest competitor, 0.87 × warm ceiling throughput) (pure code speed) |
 | P10 | simdcdc via Rust and Go bindings, 1 GiB buffer, SeqCDC AVX-512 | ≥ 95% of the C++ throughput |
 | P11 | E1 fast FastCDC vs reference FastCDC, same params, 1 core | ≥ 1.5× to keep it (otherwise dropped, not a failure) |
 
-Known limit: highly compressible unique data is bound by zstd (P3c), not the disk.
+Definitions used above:
+- *ceiling throughput* (P5b) = input bytes ÷ `io_ceiling` time for reading the input and writing our repo's bytes on the same disk.
+- *warm ceiling throughput* (P5a, P9), per dataset and per tool: `T_warm` = input bytes ÷ warm re-read median +
+  repo bytes that tool wrote ÷ `W`; warm ceiling = input bytes ÷ `T_warm`. P5a and P9 use our own repo bytes. `W` and
+  the warm re-read median come from the hardware baseline (`bench/hw/run.sh`) of the same benchmark session.
+  Example, D4-small today: 4.295 GB ÷ 13.59 GB/s + 4.32 GB ÷ 1.812 GB/s = 2.70 s → 1.59 GB/s; the P5a target is then
+  min(3 × fastest competitor, 0.87 × 1.59 = 1.38 GB/s).
+
+Known limits: highly compressible unique data is bound by zstd (P3c), not the disk. Backups of new incompressible
+data are bound by the disk's write speed `W` (~1.8 GB/s), for every tool.
 
 ## 5. Datasets (budget 170 GB; `scripts/datasets/verify.sh` fails if C: has < 30 GB free)
 | ID | Content | Size | Why |
@@ -83,11 +93,31 @@ Only scripts and sha256 manifests are in git. At most one competitor repo exists
 5. **Workloads**: first backup into a fresh repo (`init` not timed); unchanged incremental with files cache on; re-backup with files
    cache off (restic `--force`, borg `--files-cache=disabled`, kopia `--force-hash=100`, ours `--no-files-cache`);
    version-by-version incrementals (D1, D2, D3); full restore of the last snapshot.
-6. **Cold cache**: `sync`, then drop the guest page cache (sudoers rule), then read a 20 GiB flush file with O_DIRECT to evict any Windows-host
-   cache (whether the host caches is tested in W01.4). **Warm**: one unmeasured run, then measured runs, *-small datasets only.
+6. **Cold cache**: `sync`, then drop the guest page cache (`sudo -n /usr/local/sbin/dedup-drop-caches`). No flush file:
+   W01.4/G1 showed Windows does not cache the virtual disk (host-cache ratio 0.86–0.92). **Warm**: one unmeasured run,
+   then measured runs, *-small datasets only.
 7. **Timing**: wall time from process start to exit **plus a following `sync`**. `/usr/bin/time -v` gives CPU and peak RSS. `/proc/<pid>/io` gives bytes; `du -sb` gives repo size.
 8. **Repetitions**: 5 per cell. Tool order rotates in a Latin square. A 2 s calibration benchmark runs before each cell, and the cell is re-run after a
    60 s cooldown if it deviates >5%. Report median, min/max, and CoV. A cell with CoV > 5% is flagged.
 9. **Each tool's restore is verified** (sha256 manifest) at least once per dataset. A tool that fails gets no speed number.
 10. **Raw JSON** for every run (git SHA, versions, `uname`, WSL memory). Reports and criteria come only from JSON.
 11. **Caveat in every report**: WSL2 virtual-disk numbers understate raw NVMe. The comparison is fair because every tool runs on the same path.
+12. **Disk state** (G1: write speed depends on recent history, not only on the tool). `bench/hw/diskstate.py` implements:
+    (a) Before the campaign (W22), grow the virtual disk once by writing and deleting a 200 GB file, and never run
+        `wsl --manage Ubuntu --compact` during the campaign. Reason: writes that make `ext4.vhdx` grow run at ~1.25 GB/s
+        instead of ~1.8 GB/s, because Windows writes ~30% extra bytes.
+    (b) Each session starts with the hardware baseline (`bench/hw/run.sh --initial-idle 1200`): 20 min without writes,
+        then one 16 GiB write probe whose average and last 5 s must be ≥ 1.5 GB/s. This gives the session's `W`.
+        There is no probe before each cell: for ~300 write-heavy cells it would add ≥ 5 TB of writes and up to 250 h
+        of waiting (DECISIONS.md G1).
+    (c) During every cell the harness logs Windows' per-second disk counters (`\PhysicalDisk(_Total)\Disk Write Bytes/sec`,
+        `Avg. Disk Write Queue Length`, `Avg. Disk Bytes/Write`). A second is *drive-limited* when the write queue is
+        ≥ 8 deep with writes ≥ 256 KiB (the drive, not the tool, sets the pace). A write-heavy cell (≥ 4 GiB written)
+        with ≥ 5 drive-limited seconds is in the *fast* state if the median NVMe rate over those seconds is ≥ 1.4 GB/s,
+        otherwise *slow*. These thresholds are provisional and calibrated in W22.3 with fio runs in known states.
+    (d) Tool order inside every (dataset, workload, config) block is a Latin square, so tools share drive states evenly.
+    (e) A comparison (P4a, P5a–c, P9) is valid only if the majority drive state over the 5 reps is the same on both sides.
+        Otherwise those two tools' 5 reps are re-run after a 15 min rest, at most 5 such re-runs per night; the rest move
+        to the next night. Results keep their state label in every report.
+    (f) Record the `ext4.vhdx` size before and after every cell. If it grew by more than 1 GB, the cell is invalid and re-run.
+    (g) Warm ceilings are the median of 10 runs, never a single run (single warm re-reads ranged 8.8–17.0 GB/s).

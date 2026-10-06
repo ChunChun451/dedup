@@ -8,7 +8,8 @@ renamed to `## Gx — <result>` when decided, because the roadmap checks look fo
 - AMD Ryzen 7 8845HS (Zen 4), 8 cores / 16 threads, AVX-512 (F/BW/VL/DQ/VBMI/VBMI2/VPOPCNTDQ…), VAES, SHA-NI.
 - L2 1 MiB per core, L3 16 MiB.
 - 16 GiB DDR5-5600, one module (probably single-channel, ~45 GB/s theoretical). WSL2 sees 7.4 GiB before W01.3.
-- SK Hynix PC801 1 TB NVMe PCIe 4.0, which Linux sees only through a WSL2 virtual disk (ext4). C: has 269 GB free.
+- SK Hynix PC801 1 TB NVMe PCIe 4.0, which Linux sees only through a WSL2 virtual disk (ext4). C: had 269 GiB
+  (= 289 GB) free; `df -h` prints GiB, which this line first mislabeled as GB (corrected at G1).
 - Windows + WSL2 (kernel 6.18), Ubuntu 26.04, GCC 15.2, Clang 21.1, CMake 4.2.3.
 
 ## Sources
@@ -145,7 +146,7 @@ The 1.5× bar is the user's rule: a smaller gain isn't worth the extra code to m
 ## D20 — WSL2 configuration (.wslconfig)
 **Decision:** `memory=12GB`, `processors=16`, `swap=4GB`, `sparseVhd=true`, `autoMemoryReclaim=disabled`.
 **Reason:** 12 GiB leaves about 4 GiB for Windows. It fits the 4 GiB warm-cache datasets plus the index. `sparseVhd` lets the
-virtual disk give space back to C: when repos are deleted, which matters with a 170 GB budget on a drive with 269 GB free.
+virtual disk give space back to C: when repos are deleted, which matters with a 170 GB budget on a drive with 269 GiB (289 GB) free.
 Disabling automatic memory reclaim stops WSL dropping the page cache in the middle of a warm-cache benchmark.
 
 ## D20b — No sparse VHD; reclaim space with `wsl --manage Ubuntu --compact` (replaces the sparseVhd part of D20)
@@ -177,8 +178,101 @@ Example: `sudo -n /usr/local/sbin/dedup-drop-caches` works without a password, b
 
 ---
 
-## (pending) G1 — Hardware recalibration (W01)
-_Pending._
+## G1 — Targets recalibrated to the measured limits (W01, 2026-10-06)
+**Decision:** SPEC.md v1.1 changes P1, P3a, P5a and P9, adds the disk-state rules (SPEC §6.12), and drops the
+20 GiB flush file. All other targets stay. This was the one allowed revision; the numbers are now frozen.
+
+**Measured limits** (GB = 10⁹ bytes; sources: `results/hw/baseline.json`, `results/hw/g1-investigation.json`):
+| Limit | Value | How measured |
+|---|---|---|
+| RAM read, 1 / 16 threads (`M1` / `M16`) | 20.5–23.0 / 22.9–23.4 GB/s | `membw`, 4 GiB buffer, best of 7; saturates already at 2 threads (one memory module) |
+| Disk read `R` | 5.9–6.3 GB/s (baseline: 6.2) | fio, 32 GiB, O_DIRECT, 1 MiB, QD32; 5 runs |
+| Disk write `W`, fast state, space the virtual disk already has | 1.81–1.86 GB/s (baseline: 1.81) | 4 × 32 GiB (W1–W3 + rested baseline); Windows saw the NVMe write the same bytes |
+| Disk write, slow state (after ~250 GB written in 40 min) | ~1.0 GB/s | Windows per-second NVMe counter; 5 min idle refilled only ~17 GB of fast writes |
+| Disk write while `ext4.vhdx` grows | 1.26 GB/s | NVMe wrote 44.2 GB for 34.4 GB of data |
+| Native Windows write (no WSL), 8 × 64 MiB in flight | 2.13 GB/s | so WSL costs ~15%; the drive itself does not sustain its 7 GB/s rating |
+| Warm re-read (4 GiB in page cache → our buffer), 8 readers | median 13.6–14.2 GB/s (two sets of 10: 12.7–15.8) | fio, buffered, `--invalidate=0` |
+| BLAKE3, one core, 16 KiB inputs, AVX-512 | 3.76 GB/s (3.50 GiB/s) | `blake3_simd_degree()` = 16 |
+| Windows caches the virtual disk? | no (ratio 0.86–0.96) | 2 GiB O_DIRECT read-back vs `R` |
+
+**Every target against those limits:**
+| Target | What it needs | Bound by | Possible as written? | G1 change |
+|---|---|---|---|---|
+| P1 chunk ≥ 20 GB/s, 1 core, 1 GiB in RAM | read 1 GiB from RAM at 20 GB/s while chunking | RAM, 1 thread: 20.5–23.0 GB/s | Not proven impossible, but at 87–98% of `M1` it measures RAM, not our code | Split (agreed): **P1a** L2-resident 1 MiB buffer ≥ 20 GB/s (AVX2 ≥ 12), pure compute, not lowered; **P1b** 1 GiB from RAM ≥ **0.85 × `M1`** (17.4–19.6 GB/s). Report both |
+| P2 chunk+hash ≥ 15 GB/s, 16 threads, in RAM | 4.0 cores of BLAKE3 + 0.75 core of chunking; 15 of 23 GB/s RAM | BLAKE3 3.76 GB/s/core; RAM 23 GB/s (65% used) | Yes (tight on RAM) | none |
+| P3a warm, null store, all-duplicate ≥ 10 GB/s | copy every byte out of the page cache, then chunk + hash it | warm re-read 13.6–14.2 GB/s (copy alone, no work) | **Yes**: 10 is below the measured copy limit. (My ~9 GB/s was an estimate, not a measurement; see below) | Made relative, not lowered: ≥ **0.7 × warm re-read median** of the same session (9.5–9.9 GB/s today). If W17 misses it, the gap plan says so. mmap stays a later experiment |
+| P3b same, unique incompressible ≥ 5 GB/s | copy + chunk + hash + zstd attempt + AES-GCM, nothing written | CPU: estimate 4.6–5.7 GB/s (zstd speed on random data unmeasured until W11.3); not bound by disk | Yes, unverified; a cheap "does it compress?" check before zstd gives ~7 GB/s | none |
+| P3c same, compressible 3:1 ≥ 2.5 GB/s | the above + zstd level 1 on every byte | CPU: zstd ~0.6 GB/s/core → estimate ~3 GB/s on 8 cores | Yes (tight), unverified until W11 | none |
+| P4a cold first backup D2/D4 ≤ 1.15 × `io_ceiling` | read input + write repo on one disk | R 6.3 / W 1.8, but the target is relative | Yes, if our run and `io_ceiling` see the same disk state | SPEC §6.12 rules make that true |
+| P4b cold re-backup, no files cache ≤ 1.10 × read time | chunk + hash at ≥ 5.7 GB/s from O_DIRECT reads | R 6.3 GB/s; needs ~1.5 cores of hashing | Yes | none |
+| P5a warm first backup ≥ 3 × fastest competitor, every dataset | on **D4-small** every tool must write all ~4.3 GB of random data, and timing includes `sync` | **W 1.81 GB/s**: D4-small warm ceiling = **1.59 GB/s for any tool** | **No** on D4-small once the fastest competitor passes 1.59 ÷ 3 = 0.53 GB/s (measured limit W) | ≥ **min(3 × fastest, 0.87 × our warm ceiling)**. On D4-small today: 0.87 × 1.59 = **1.38 GB/s**, so the 3× rule binds only while the fastest competitor is below 0.46 GB/s |
+| P5b cold first backup ≥ min(2 × fastest, 0.87 × ceiling) | **D4**: read 34.4 GB + write ~34.6 GB on one disk | W: ≥ 19 s of writing → ≤ ~1.8 GB/s for every tool | Yes: the cap is already there; on D4 it is effectively "≥ 0.87 × `io_ceiling`" | none; valid only with §6.12 (a tool measured in the slow state would look 45% slower) |
+| P5c cold restore ≥ min(2 × fastest, 0.85 × `W`) | D4: write 34.4 GB | W 1.8 GB/s | Yes (cap) | `W` = fast-state value; §6.12 rules apply |
+| P5d unchanged incremental, files cache on ≤ fastest | stat ~1M files (D1) | metadata, none of the measured limits | Yes | none |
+| P6 repo size ≤ smallest competitor; D4 ≤ 1.01 × input | per-chunk overhead ≈ 16 B tag + ~32 B header + 48 B index per 16 KiB ≈ 0.6% | not a speed target | Yes | none |
+| P7 RSS ≤ 1.5 GiB + 64 B/chunk | D4: 2.1 M chunks → +134 MB | 11.7 GiB visible RAM | Yes | none |
+| P8 SeqCDC dedup within 3% of FastCDC | data-dependent | not a speed target | Decided at G2 | none |
+| P9 1 MiB chunks, warm first backup ≥ 3 × fastest (same config) | same write floor as P5a | W 1.81 GB/s | **No** on D4-small (same reason as P5a) | same cap as P5a, with our 1 MiB-chunk repo bytes (D4-small: also ≈ 1.38 GB/s) |
+| P10 bindings ≥ 95% of C++ | same compute through FFI | CPU | Yes | none |
+| P11 E1 fast FastCDC ≥ 1.5× (keep/drop) | Gear hash at a few GB/s | CPU, far below RAM | Yes (an experiment; either outcome is allowed) | none |
+
+**Official baseline** (`results/hw/baseline.json`, rested 20 min, probe 1.94 GB/s average / 1.62 last 5 s):
+R 6.20, W 1.81, M1 20.5, M16 22.9, warm re-read median 13.6 GB/s, no host caching, no virtual-disk growth.
+
+**Other changes:**
+- SPEC §6.6: no 20 GiB flush file. Windows does not cache the virtual disk, so dropping the Linux page cache is enough.
+- SPEC §6.12 (new), disk-state rules (see "Probe cost" below for why there is no per-cell probe): grow the virtual
+  disk once before the campaign and never compact it during the campaign; one rested 16 GiB write probe per session;
+  Windows' per-second disk counters classify every write-heavy cell as fast or slow drive state; tool order is a Latin
+  square; a comparison whose two sides ran in different drive states is re-run (capped per night); a cell during which
+  `ext4.vhdx` grew > 1 GB is re-run; warm ceilings are medians of 10 runs.
+- `bench/hw/run.py` (the baseline, run once per session) uses the rested probe, logs the write speed per second, and
+  records virtual-disk growth.
+
+**Warm ceiling, exact definition (P5a, P9):** for one dataset and one tool,
+`T_warm = input bytes ÷ warm re-read median + repo bytes that tool wrote ÷ W`, and warm ceiling = input bytes ÷ `T_warm`.
+P5a and P9 use our own repo bytes; `W` and the warm re-read median come from the hardware baseline of the same session.
+D4-small today: 4.295 GB ÷ 13.59 GB/s + 4.32 GB ÷ 1.812 GB/s = 0.316 s + 2.385 s = 2.701 s → **1.59 GB/s**;
+0.87 × 1.59 = **1.38 GB/s**. (4.32 GB = 4.295 GB of random data + ~0.6% per-chunk overhead; the real value is measured.)
+
+**Estimates vs measurements (G1 rule: only lower what measurements prove impossible):**
+- The "~9 GB/s" for P3a was arithmetic: each of 8 fio readers copies at 14.2 ÷ 8 = 1.78 GB/s (measured), BLAKE3
+  3.76 GB/s per core (measured), chunking 20 GB/s per core (a target, not measured); assuming no overlap and no SMT gain,
+  1 ÷ (1/1.78 + 1/3.76 + 1/20) = 1.14 GB/s per core × 8 = 9.1 GB/s. Both assumptions are pessimistic, so it proves
+  nothing. P3a therefore keeps ~10 GB/s, tied to the measured copy speed (0.7×).
+- The 0.75 first proposed for P1b was reasoning only (one core cannot fully overlap RAM loads with compute), not a
+  measurement, so P1b uses 0.85.
+
+**Probe cost — why the per-cell probe was dropped:** the full matrix has about **300 write-heavy cells** (≥ 4 GiB written):
+cold first backups of D3 and D4 (12 tool-configs × 2 × 5 reps = 120, ~22 GB each), warm first backups of D4-small
+(60, ~4.3 GB each) and cold restores of D3 and D4 (120, ~26 GB each). They write ~6.0 TB themselves.
+| Per-cell 16 GiB probe rule | Cost |
+|---|---|
+| Probe writes, every probe passes at once | 5.15 TB (almost doubles the matrix's writes) |
+| Probe writes, worst case (6 tries per cell) | 30.9 TB |
+| Waiting, one 10-min wait per cell | 50 h |
+| Waiting, worst case (5 waits per cell) | 250 h |
+| Rest needed to run every cell in the fast state (~17 GB refilled per 5 min) | ~30 h |
+One night is ~10 h, so no rule can keep all 300 cells on a rested drive. The rule instead makes the drive state visible
+and keeps comparisons like-for-like: one probe per session (~17 GB), free counters, and re-runs only for comparisons
+whose sides ran in different states (at most 5 per night, ~1.5 TB worst case; the rest move to the second night, since
+W23.1 and W25.1 already plan two nights). Not chosen: SNIA-style "precondition everything to the slow steady state",
+because a real nightly backup usually starts on a rested drive.
+
+**Reason — write speed depends on history:** in reused space, three 32 GiB writes ran at 1.81–1.86 GB/s, with or
+without 3 minutes idle before them. After ~250 GB of writes in 40 minutes, the same write ran at ~1.0 GB/s and Windows
+saw the NVMe itself at ~1.0 GB/s. 5 minutes of idle refilled only ~17 GB of fast writes (an 8 GiB probe passed at
+2.05 GB/s; the 32 GiB write after it fell back to ~1.0). So the drive's recent history decides the speed. A fair
+comparison must start every write-heavy cell from the same rested state.
+
+**Reason — the warm re-read outlier:** one run gave 8.8 GB/s. These did not reproduce it: thread pinning (median
+14.3 vs 14.2), CPU clock (±4%), file not fully cached (100% cached every time), heavy writes just before (24 runs,
+10.2–17.0) and first pass after caching (weak, ≤ 20%). About 80 runs later the lowest 8-reader run was 9.0. Cause unknown;
+most likely a one-off interruption from Windows: the rested baseline had one single-reader run at 0.63 GB/s while the
+other nine were 5.5–7.8. Hence the median-of-10 rule.
+
+**Facts corrected at G1:** C: free space was 269 GiB (289 GB) at session start, not "269 GB". Before W01.4 it was 400 GiB,
+because something on the Windows side freed ~131 GiB. Now it is 384.7 GB (358 GiB), after the virtual disk grew by ~37 GB for the tests.
 
 ## (pending) G2 — SeqCDC vs FastCDC dedup (W04)
 _Pending._

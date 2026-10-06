@@ -23,7 +23,9 @@ Each session ends with: update `docs/PROGRESS.md`, add anything new to `docs/LEA
 ### W02 [core] Datasets & harness
 - W02.1 `dedup-gen` (random/text/mixed/mutate, seeded, streaming). Done when: `ctest --preset release -R gen_golden`
 - W02.2 Dataset scripts D1–D4 + *-small, sha256 manifests, free-space guard. Done when: `scripts/datasets/verify.sh small`
-- W02.3 `bench/e2e/run.py` (TOML, cold/warm, Latin square, calibration, sync in timing, time -v, /proc io, JSON).
+- W02.3 `bench/e2e/run.py` (TOML, cold/warm, Latin square, calibration, sync in timing, time -v, /proc io, JSON,
+  disk-state rules from SPEC §6.12 via `bench/hw/diskstate.py`: session probe, per-second Windows disk counters,
+  fast/slow drive-state label per cell, vhdx growth check).
   Done when: `python3 bench/e2e/run.py --tools cp --datasets d3-small --reps 3 --out results/smoke && python3 bench/e2e/validate.py results/smoke`
 - W02.4 `io_ceiling` tool. Done when: `$B/io_ceiling --read data/d4-small --write-bytes 1G --json | python3 -m json.tool`
 
@@ -49,7 +51,7 @@ Each session ends with: update `docs/PROGRESS.md`, add anything new to `docs/LEA
 ### W06 [core] SeqCDC AVX-512 + dispatch
 - W06.1 AVX-512BW (`_mm512_cmpgt_epu8_mask`). Done when: `ctest --preset release -R seqcdc_diff_avx512`
 - W06.2 Runtime dispatch + `DEDUP_ISA` override. Done when: `for i in scalar avx2 avx512; do DEDUP_ISA=$i $B/dedup chunk-stats --digest-only data/d3-small/f0; done | sort -u | wc -l | grep -qx 1`
-- W06.3 Tuning to P1. Done when: `$B/bench_micro --benchmark_filter='SeqCDC/avx512/16K' --benchmark_format=json | python3 bench/micro/assert.py --min-gbps 20`
+- W06.3 Tuning to P1a (L2-resident 1 MiB buffer) and report P1b (1 GiB from RAM, ≥ 0.85 × M1). Done when: `$B/bench_micro --benchmark_filter='SeqCDC/avx512/16K/L2' --benchmark_format=json | python3 bench/micro/assert.py --min-gbps 20`
 - W06.4 libFuzzer differential fuzz, 15 min. Done when: `scripts/fuzz.sh seqcdc_diff 900`
 
 ### W07 [core] Experiment E1 + 1 MiB profile + chunker decision
@@ -153,8 +155,8 @@ Each session ends with: update `docs/PROGRESS.md`, add anything new to `docs/LEA
 ## Phase E — Benchmark campaign & release
 ### W22 [core] Freeze methodology
 - W22.1 Final tool configs: defaults, matched, **same-chunk-size 1 MiB** (SPEC §6.3c). Pinned versions. Done when: `python3 bench/e2e/run.py --all --dry-run | grep -c '^CMD' | grep -qx "$(python3 bench/e2e/matrix.py --count)" && python3 bench/e2e/run.py --all --dry-run | grep -q 'DYNAMIC-1M-BUZHASH'`
-- W22.2 All full datasets present + verified. Done when: `scripts/datasets/verify.sh all`
-- W22.3 Variance study: ours + kopia 10×, CoV ≤ 5%. Done when: `python3 bench/e2e/variance.py results/w22-var --max-cov 0.05`
+- W22.2 All full datasets present + verified; virtual disk grown once (SPEC §6.12a). Done when: `scripts/datasets/verify.sh all && scripts/vhdx-pregrow.sh --check`
+- W22.3 Variance study: ours + kopia 10×, CoV ≤ 5%; calibrate the drive-state thresholds (SPEC §6.12c) with fio runs in known fast and slow states. Done when: `python3 bench/e2e/variance.py results/w22-var --max-cov 0.05`
 - W22.4 Pilot matrix, 1 rep (overnight). Done when: `python3 bench/e2e/validate.py results/pilot --complete`
 
 ### W23 [core] Run 1

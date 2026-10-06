@@ -1,8 +1,8 @@
 {
-  "schema": 1,
-  "created": "2026-10-06T20:46:06+00:00",
-  "git_sha": "0fc18c54ee89997db9207ad7e99579f6ebc38aba",
-  "raw_dir": "results/raw/hw/20261006T204606",
+  "schema": 2,
+  "created": "2026-10-06T21:25:06+00:00",
+  "git_sha": "b1cae7d71154010de708e1232df40a19ce82143d",
+  "raw_dir": "results/raw/hw/20261006T212506",
   "machine": {
     "cpu": "AMD Ryzen 7 8845HS w/ Radeon 780M Graphics",
     "nproc": 16,
@@ -18,49 +18,92 @@
     "iodepth": 32,
     "engine": "libaio",
     "direct": true,
+    "write_probes_gbps": [
+      [
+        1.938,
+        1.623
+      ]
+    ],
+    "vhdx_growth_gb": 0.0,
     "seq_write": {
-      "gbps": 1.476,
-      "wall_gbps": 1.433,
+      "gbps": 1.812,
+      "wall_gbps": 1.715,
       "io_bytes": 34359738368,
-      "error": 0
+      "error": 0,
+      "per_second_gbps": {
+        "min": 1.46,
+        "median": 1.76,
+        "max": 2.22,
+        "seconds": 19
+      }
     },
     "seq_read": {
-      "gbps": 5.892,
-      "wall_gbps": 5.363,
+      "gbps": 6.199,
+      "wall_gbps": 5.697,
       "io_bytes": 34359738368,
-      "error": 0
+      "error": 0,
+      "per_second_gbps": {
+        "min": 5.98,
+        "median": 6.13,
+        "max": 6.41,
+        "seconds": 5
+      }
     }
   },
   "host_cache": {
     "file_gib": 2,
     "read_1": {
-      "gbps": 5.409,
-      "wall_gbps": 2.423,
+      "gbps": 5.773,
+      "wall_gbps": 2.437,
       "io_bytes": 2147483648,
       "error": 0
     },
     "read_2": {
-      "gbps": 4.994,
-      "wall_gbps": 2.707,
+      "gbps": 5.263,
+      "wall_gbps": 2.724,
       "io_bytes": 2147483648,
       "error": 0
     },
-    "ratio_vs_R": 0.92,
+    "ratio_vs_R": 0.93,
     "host_caches": false
   },
   "warm_read": {
     "file_gib": 4,
     "readers_1": {
-      "gbps": 2.873,
-      "wall_gbps": 2.2,
-      "io_bytes": 4294967296,
-      "error": 0
+      "runs": 10,
+      "median": 7.47,
+      "min": 0.63,
+      "max": 7.838,
+      "all": [
+        0.63,
+        7.823,
+        7.28,
+        7.418,
+        7.838,
+        7.642,
+        7.38,
+        6.95,
+        7.522,
+        7.522
+      ]
     },
     "readers_8": {
-      "gbps": 8.765,
-      "wall_gbps": 4.427,
-      "io_bytes": 4294967296,
-      "error": 0
+      "runs": 10,
+      "median": 13.59,
+      "min": 12.745,
+      "max": 14.51,
+      "all": [
+        12.745,
+        13.256,
+        13.855,
+        14.51,
+        13.506,
+        12.937,
+        12.859,
+        14.175,
+        13.9,
+        13.678
+      ]
     }
   },
   "memory": {
@@ -69,8 +112,8 @@
       "buffer_gib": 4,
       "huge_pages": true,
       "reps": 7,
-      "best_gbps": 21.59,
-      "median_gbps": 20.2,
+      "best_gbps": 20.53,
+      "median_gbps": 20.44,
       "sink": 0
     },
     "2": {
@@ -78,8 +121,8 @@
       "buffer_gib": 4,
       "huge_pages": true,
       "reps": 7,
-      "best_gbps": 22.61,
-      "median_gbps": 21.29,
+      "best_gbps": 22.11,
+      "median_gbps": 21.61,
       "sink": 0
     },
     "4": {
@@ -87,8 +130,8 @@
       "buffer_gib": 4,
       "huge_pages": true,
       "reps": 7,
-      "best_gbps": 22.86,
-      "median_gbps": 22.19,
+      "best_gbps": 22.88,
+      "median_gbps": 22.71,
       "sink": 0
     },
     "8": {
@@ -96,8 +139,8 @@
       "buffer_gib": 4,
       "huge_pages": true,
       "reps": 7,
-      "best_gbps": 22.96,
-      "median_gbps": 22.72,
+      "best_gbps": 22.71,
+      "median_gbps": 22.62,
       "sink": 0
     },
     "16": {
@@ -105,16 +148,16 @@
       "buffer_gib": 4,
       "huge_pages": true,
       "reps": 7,
-      "best_gbps": 23.07,
-      "median_gbps": 21.16,
+      "best_gbps": 22.85,
+      "median_gbps": 22.29,
       "sink": 0
     }
   },
   "ceilings": {
-    "R_gbps": 5.892,
-    "W_gbps": 1.476,
-    "M1_gbps": 21.59,
-    "M16_gbps": 23.07,
-    "warm_read_8_gbps": 8.765
+    "R_gbps": 6.199,
+    "W_gbps": 1.812,
+    "M1_gbps": 20.53,
+    "M16_gbps": 22.85,
+    "warm_read_8_gbps": 13.59
   }
 }
