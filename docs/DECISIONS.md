@@ -223,6 +223,18 @@ drive states).
 and auditable; everything SPEC section 6 asks for is recorded where it happens, so reports never need a re-run.
 Calibration repeats within ±2.5% here (1.122–1.154), so 5% separates real slowdowns from noise.
 
+## D25 — io_ceiling: parallel O_DIRECT reads in path order, preallocated parallel writes, two modes
+**Decision:** `tools/io_ceiling` reads every regular file under the inputs in sorted path order, split into segments of
+up to 16 MiB that 8 threads read with 1 MiB O_DIRECT requests. It writes the requested bytes into a new file in
+`data/scratch/io_ceiling`: `posix_fallocate` first, then 8 threads with 1 MiB O_DIRECT writes, then `fdatasync`, all
+timed. It runs a *sequential* mode (read, then write) and an *overlapped* mode (both at once), each after dropping
+the page cache. The ceiling is the faster one (G1b).
+**Reason:** a ceiling must be the best a tool could possibly do on this disk. One request at a time would understate the
+disk, so several threads keep requests in flight. Without `fallocate`, 8 threads extending a new file measured
+0.6–0.75 GB/s instead of ~1.8, because ext4 allocates blocks during each write. A tool could preallocate too, so the
+ceiling does. First measurements on D4-small (4.29 GB read): with 1 GiB written, ceiling 1.18–1.22 s, overlapped;
+with 4 GiB written, 4.11 s (writes at ~1.05 GB/s, the drive's slow state after a day of tests).
+
 ---
 
 ## G1 — Targets recalibrated to the measured limits (W01, 2026-10-06)

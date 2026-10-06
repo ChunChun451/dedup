@@ -19,6 +19,7 @@ target_include_directories(dedup PRIVATE ${CMAKE_BINARY_DIR}/generated)
 target_link_libraries(dedup PRIVATE dedup_warnings)
 
 add_subdirectory(tools/gen)
+add_subdirectory(tools/io_ceiling)
 
 enable_testing()
 add_subdirectory(tests)
