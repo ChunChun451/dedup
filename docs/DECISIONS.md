@@ -208,6 +208,21 @@ tree, instead of one line per file (~1.2 M lines for D1), keeps the manifest sma
 and times makes the digest identical on any machine. D4 is split 20 + 12 GiB so that W15.3 has a single file larger than
 RAM (`big0`). Measured: verifying the three small sets takes ~1 min, mostly opening D1-small's ~90k files (36 s).
 
+## D24 — Benchmark harness design (bench/e2e/run.py)
+**Decision:** a tool is described by `bench/tools/<tool>.toml` (version command, init/backup/restore command lists
+with `{src}`, `{repo}`, `{target}`, `{bin}`, `{secrets}`, `{config_args}` placeholders, and named configs). A cell
+is (tool, config, dataset, workload, rep). For each cell: fresh repo (or a reused one-snapshot repo for restores),
+unmeasured warm-up run for `*-small` datasets or dropped page cache for full ones, a 2 s calibration (`calib`;
+> 5% off the session baseline → 60 s cooldown, up to 3 times), then the command under `/usr/bin/time -v`, followed by
+`sync` inside the timed span. Recorded: wall, user/sys CPU, peak RSS, filesystem bytes, repo size, virtual-disk growth,
+Windows disk counters sampled about once per second (stop-file controlled) and the drive-state label (SPEC 6.12),
+and a tree-digest check of the first restore per (tool, config, dataset). Tool order rotates per rep (cyclic Latin
+square). One JSON file per cell, plus `session.json`, `plan.json`, `summary.json` (median, min, max, CoV, CoV > 5% flag,
+drive states).
+**Reason:** commands as argument lists (no shell) avoid quoting bugs; one file per cell makes a long night resumable
+and auditable; everything SPEC section 6 asks for is recorded where it happens, so reports never need a re-run.
+Calibration repeats within ±2.5% here (1.122–1.154), so 5% separates real slowdowns from noise.
+
 ---
 
 ## G1 — Targets recalibrated to the measured limits (W01, 2026-10-06)

@@ -25,6 +25,7 @@ import statistics
 import time
 
 from diskstate import vhdx_bytes, wait_for_fast_writes
+from machine import machine_info
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 GiB = 1 << 30
@@ -80,35 +81,6 @@ def membw(threads):
     return json.loads(sh([str(exe), str(threads), "4"]))
 
 
-def windows_power():
-    """Return AC/battery state and power mode as seen by Windows (best effort)."""
-    ps = ("Add-Type -AssemblyName System.Windows.Forms;"
-          "[System.Windows.Forms.SystemInformation]::PowerStatus.PowerLineStatus;"
-          "(Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Power\\User\\PowerSchemes')"
-          ".ActiveOverlayAcPowerScheme")
-    try:
-        out = sh(["powershell.exe", "-NoProfile", "-Command", ps], cwd="/mnt/c", timeout=60).split()
-        overlay = {"ded574b5-45a0-4f42-8737-46345c09c238": "best_performance",
-                   "961cc777-2547-4f9d-8174-7d86181b8a7a": "best_power_efficiency",
-                   "00000000-0000-0000-0000-000000000000": "balanced"}
-        return {"power_line": out[0], "power_mode": overlay.get(out[1] if len(out) > 1 else "", "unknown")}
-    except Exception as e:  # noqa: BLE001 - recorded, not fatal
-        return {"power_line": "unknown", "power_mode": "unknown", "error": str(e)}
-
-
-def machine_info():
-    cpu = next(l.split(":", 1)[1].strip() for l in open("/proc/cpuinfo") if l.startswith("model name"))
-    mem_kib = int(next(l.split()[1] for l in open("/proc/meminfo") if l.startswith("MemTotal")))
-    return {
-        "cpu": cpu,
-        "nproc": os.cpu_count(),
-        "mem_total_gib": round(mem_kib / (1 << 20), 2),
-        "kernel": os.uname().release,
-        "fio": sh(["fio", "--version"]).strip(),
-        **windows_power(),
-    }
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dir", default=str(ROOT / "data/scratch/hw"), help="where the test files go (ext4 disk)")
@@ -130,7 +102,8 @@ def main():
 
     res = {"schema": 2, "created": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
            "git_sha": sh(["git", "-C", str(ROOT), "rev-parse", "HEAD"]).strip(),
-           "raw_dir": str(raw.relative_to(ROOT)), "machine": machine_info()}
+           "raw_dir": str(raw.relative_to(ROOT)),
+           "machine": machine_info([("fio", ["fio", "--version"])])}
     try:
         print(f"[1/6] write probe: wait until the SSD is in its fast write state", flush=True)
         probes = wait_for_fast_writes(work, raw, log=lambda m: print(m, flush=True), initial_idle_s=a.initial_idle)

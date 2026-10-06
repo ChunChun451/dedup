@@ -10,6 +10,7 @@ Two effects found at G1 make write speed depend on history, not only on the code
    falls to ~1.25 GB/s. Rule: the virtual disk is grown once before measuring, and a measurement during which
    it grew by more than 1 GB is invalid.
 """
+import datetime
 import glob
 import json
 import os
@@ -70,3 +71,76 @@ def wait_for_fast_writes(work_dir, raw_dir=None, log=print, initial_idle_s=0):
             log(f"  disk is in its slow write state; idle {WAIT_S} s")
             time.sleep(WAIT_S)
     raise RuntimeError(f"disk stayed below {FAST_GBPS} GB/s after {MAX_TRIES} probes: {tries}")
+
+
+# ---------- Windows disk counters during a benchmark cell (SPEC.md 6.12c) ----------
+
+WIN_TEMP_LINUX = "/mnt/c/Users/{user}/AppData/Local/Temp"
+DRIVE_LIMITED_QUEUE = 8          # provisional, calibrated in W22.3
+DRIVE_LIMITED_WRITE_BYTES = 256 << 10
+DRIVE_LIMITED_MIN_SECONDS = 5
+FAST_STATE_GBPS = 1.4
+WRITE_HEAVY_BYTES = 4 * GiB
+
+
+class WinDiskCounters:
+    """Samples Windows' physical-disk write counters about once per second until stop() is called.
+
+    Uses a stop file instead of killing PowerShell, because killing the WSL side can leave powershell.exe running."""
+
+    COUNTERS = ["\\PhysicalDisk(_Total)\\Disk Write Bytes/sec",
+                "\\PhysicalDisk(_Total)\\Avg. Disk Write Queue Length",
+                "\\PhysicalDisk(_Total)\\Avg. Disk Bytes/Write"]
+
+    def __init__(self, tag):
+        user = os.environ.get("DEDUP_WIN_USER") or os.path.basename(glob.glob("/mnt/c/Users/*/AppData/Local/wsl")[0]
+                                                                      .rsplit("/AppData", 1)[0])
+        self.stop_linux = pathlib.Path(WIN_TEMP_LINUX.format(user=user)) / f"dedup-counters-{tag}.stop"
+        self.stop_win = f"C:\\Users\\{user}\\AppData\\Local\\Temp\\dedup-counters-{tag}.stop"
+        self.proc = None
+
+    def start(self):
+        self.stop_linux.unlink(missing_ok=True)
+        counters = ",".join(f"'{c}'" for c in self.COUNTERS)
+        script = (f"$c = @({counters}); $first = $true; "
+                  f"while (-not (Test-Path '{self.stop_win}')) {{ "
+                  "$s = Get-Counter -Counter $c -SampleInterval 1 -MaxSamples 1; "
+                  "$v = ($s.CounterSamples | ForEach-Object { $_.CookedValue }) -join ','; "
+                  "if ($first) { [Console]::Out.WriteLine('READY'); $first = $false }; "
+                  "[Console]::Out.WriteLine($s.Timestamp.ToUniversalTime().ToString('o') + ',' + $v) }")
+        self.proc = subprocess.Popen(["powershell.exe", "-NoProfile", "-Command", script], cwd="/mnt/c",
+                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        # Wait for the first sample, so the measured command never runs unobserved.
+        line = self.proc.stdout.readline()
+        if line.strip() != "READY":
+            raise RuntimeError("Windows disk counters did not start")
+        return self
+
+    def stop(self):
+        """Stop sampling; return a list of (unix_time, write_bytes_per_s, write_queue, bytes_per_write)."""
+        self.stop_linux.touch()
+        out, _ = self.proc.communicate(timeout=30)
+        self.stop_linux.unlink(missing_ok=True)
+        samples = []
+        for line in out.splitlines():
+            parts = line.strip().split(",")
+            if len(parts) != 4:
+                continue
+            ts = datetime.datetime.fromisoformat(parts[0]).timestamp()
+            samples.append((ts, float(parts[1]), float(parts[2]), float(parts[3])))
+        return samples
+
+
+def classify_drive_state(samples, t0, t1):
+    """SPEC.md 6.12c: label a cell 'fast', 'slow' or 'n/a' from Windows disk samples taken between t0 and t1."""
+    inside = [s for s in samples if t0 <= s[0] <= t1 + 1.5]
+    written = sum(s[1] for s in inside)  # ~1 s per sample
+    limited = [s[1] for s in inside if s[2] >= DRIVE_LIMITED_QUEUE and s[3] >= DRIVE_LIMITED_WRITE_BYTES]
+    res = {"samples": len(inside), "nvme_written_gb": round(written / 1e9, 2), "drive_limited_s": len(limited),
+           "median_limited_gbps": round(statistics.median(limited) / 1e9, 3) if limited else None,
+           "max_queue": round(max((s[2] for s in inside), default=0), 1)}
+    if written < WRITE_HEAVY_BYTES or len(limited) < DRIVE_LIMITED_MIN_SECONDS:
+        res["state"] = "n/a"
+    else:
+        res["state"] = "fast" if statistics.median(limited) >= FAST_STATE_GBPS * 1e9 else "slow"
+    return res

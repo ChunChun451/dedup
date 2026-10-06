@@ -1,0 +1,13 @@
+# Dummy "backup tool" for testing the harness: a backup is a plain copy, a restore copies it back.
+# Placeholders: {src} dataset directory, {repo} empty repo directory, {target} empty restore directory,
+#               {bin} tools/bin, {secrets} directory with keyfile/password files, {config_args} from [configs].
+name = "cp"
+version_cmd = ["cp", "--version"]
+
+[commands]
+init = []
+backup = ["cp", "-a", "{src}/.", "{repo}/snapshot"]
+restore = ["cp", "-a", "{repo}/snapshot/.", "{target}"]
+
+[configs.defaults]
+args = []
