@@ -58,12 +58,16 @@ with the reason in `docs/DECISIONS.md`. After that they are frozen. `bench/e2e/c
 | P11 | E1 fast FastCDC vs reference FastCDC, same params, 1 core | ≥ 1.5× to keep it (otherwise dropped, not a failure) |
 
 Definitions used above:
-- *ceiling throughput* (P5b) = input bytes ÷ `io_ceiling` time for reading the input and writing our repo's bytes on the same disk.
-- *warm ceiling throughput* (P5a, P9), per dataset and per tool: `T_warm` = input bytes ÷ warm re-read median +
-  repo bytes that tool wrote ÷ `W`; warm ceiling = input bytes ÷ `T_warm`. P5a and P9 use our own repo bytes. `W` and
-  the warm re-read median come from the hardware baseline (`bench/hw/run.sh`) of the same benchmark session.
-  Example, D4-small today: 4.295 GB ÷ 13.59 GB/s + 4.32 GB ÷ 1.812 GB/s = 2.70 s → 1.59 GB/s; the P5a target is then
-  min(3 × fastest competitor, 0.87 × 1.59 = 1.38 GB/s).
+- *ceiling throughput* (P4a, P5b) = input bytes ÷ `io_ceiling` time for reading the input and writing our repo's bytes
+  on the same disk. `io_ceiling` measures two modes, *sequential* (read everything, then write) and *overlapped* (read and
+  write at the same time); the ceiling uses the faster (shorter) of the two.
+- *warm ceiling throughput* (P5a, P9), per dataset and per tool: `T_warm` = max(input bytes ÷ warm re-read median,
+  repo bytes that tool wrote ÷ `W`); warm ceiling = input bytes ÷ `T_warm`. It is a max, not a sum, because warm reads
+  come from RAM and a pipeline reads the next piece while the previous one is being written (G1 correction).
+  P5a and P9 use our own repo bytes. `W` and the warm re-read median come from the hardware baseline
+  (`bench/hw/run.sh`) of the same benchmark session.
+  Example, D4-small today: max(4.295 GB ÷ 13.59 GB/s, 4.32 GB ÷ 1.812 GB/s) = max(0.316 s, 2.385 s) = 2.385 s
+  → 1.80 GB/s; the P5a target is then min(3 × fastest competitor, 0.87 × 1.80 = 1.57 GB/s).
 
 Known limits: highly compressible unique data is bound by zstd (P3c), not the disk. Backups of new incompressible
 data are bound by the disk's write speed `W` (~1.8 GB/s), for every tool.

@@ -27,7 +27,9 @@ Each session ends with: update `docs/PROGRESS.md`, add anything new to `docs/LEA
   disk-state rules from SPEC §6.12 via `bench/hw/diskstate.py`: session probe, per-second Windows disk counters,
   fast/slow drive-state label per cell, vhdx growth check).
   Done when: `python3 bench/e2e/run.py --tools cp --datasets d3-small --reps 3 --out results/smoke && python3 bench/e2e/validate.py results/smoke`
-- W02.4 `io_ceiling` tool. Done when: `$B/io_ceiling --read data/d4-small --write-bytes 1G --json | python3 -m json.tool`
+- W02.4 `io_ceiling` tool with two modes: sequential (read all, then write) and overlapped (read and write at the same
+  time); reports both and `ceiling_s` = the faster one (SPEC §4.2 definitions, G1b).
+  Done when: `$B/io_ceiling --read data/d4-small --write-bytes 1G --json | python3 tests/assert_keys.py sequential.total_s overlapped.total_s ceiling_s ceiling_mode`
 
 ### W03 [core] Competitors & chunker foundation
 - W03.1 Pinned restic/kopia/borg binaries into `tools/bin`, sha256 in `bench/tools.lock`. Done when: `scripts/tools/verify.sh`

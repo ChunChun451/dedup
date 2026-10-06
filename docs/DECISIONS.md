@@ -274,6 +274,19 @@ other nine were 5.5–7.8. Hence the median-of-10 rule.
 **Facts corrected at G1:** C: free space was 269 GiB (289 GB) at session start, not "269 GB". Before W01.4 it was 400 GiB,
 because something on the Windows side freed ~131 GiB. Now it is 384.7 GB (358 GiB), after the virtual disk grew by ~37 GB for the tests.
 
+## G1b — Correction to G1: warm ceiling uses max(), io_ceiling measures two modes (2026-10-06)
+**Decision:** replaces the warm-ceiling formula in G1 (the P5a and P9 rows and "Warm ceiling, exact definition").
+`T_warm = max(input bytes ÷ warm re-read median, repo bytes that tool wrote ÷ W)`, not their sum. For P4a and P5b,
+`io_ceiling` (W02.4) measures a *sequential* mode (read all input, then write the repo bytes) and an *overlapped* mode
+(read and write at the same time on the same disk); the ceiling is the faster of the two.
+**Reason:** a warm read comes from RAM, not the SSD, and a pipeline reads the next piece while the previous one is being
+written. So the minimum time is the longer of the two, not their sum. D4-small today:
+max(0.316 s, 2.385 s) = 2.385 s → warm ceiling **1.80 GB/s** (G1 said 1.59). The P5a/P9 cap becomes
+0.87 × 1.80 = **1.57 GB/s** (G1 said 1.38), and the "3 × fastest" part binds while the fastest competitor is below
+0.52 GB/s. For cold runs, reads and writes share one SSD, so whether overlap helps is a measurement, not an
+assumption: hence both modes. Both changes raise the ceiling, so the targets get stricter, never easier, which keeps
+the G1 rule (only measurements may lower a target). The user spotted the sum.
+
 ## (pending) G2 — SeqCDC vs FastCDC dedup (W04)
 _Pending._
 
