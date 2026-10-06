@@ -163,6 +163,18 @@ Disabling automatic memory reclaim stops WSL dropping the page cache in the midd
   `--compact` (calls Windows `CompactVirtualDisk`) then shrinks the file. That is manual, but safe. Revisit when a
   stable WSL release supports sparse disks again (3.0.2 pre-release re-adds them as experimental).
 
+## D21 — One sudo script; cold-cache helper with the smallest possible permission
+**Decision:** `scripts/setup-system.sh` (run once with sudo) installs every system package the roadmap needs:
+fio, hyperfine, libssl-dev, pkg-config, and the build dependencies of `perf` for W05.1 (flex, bison, libelf-dev,
+libdw-dev, libtraceevent-dev, libcap-dev). It also installs `/usr/local/sbin/dedup-drop-caches` (root-owned, mode 755)
+and a sudoers rule that lets only this user run only that file, with no arguments, without a password.
+`scripts/check-env.sh` verifies all of it without sudo.
+**Reason:** the user agreed to type the password once, so everything that needs root goes into this one script now,
+including packages needed months later. Cold-cache benchmarks must empty the Linux file cache before every
+run, which needs root. A root-owned helper that takes no arguments is the narrowest permission that works:
+the user cannot edit the file, and sudo refuses any extra arguments (the `""` in the rule).
+Example: `sudo -n /usr/local/sbin/dedup-drop-caches` works without a password, but `sudo -n ls` still asks for one.
+
 ---
 
 ## (pending) G1 — Hardware recalibration (W01)
