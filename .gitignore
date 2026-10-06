@@ -1,0 +1,15 @@
+# Build output
+build/
+# Datasets (large, third-party licenses) — only scripts + sha256 manifests are committed
+data/
+# Downloaded competitor / helper binaries
+tools/bin/
+# Raw benchmark logs (summaries under results/ are committed)
+results/raw/
+# Editor / OS noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
+# Local-only Claude Code settings
+.claude/settings.local.json
