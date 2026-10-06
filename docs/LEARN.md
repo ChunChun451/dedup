@@ -41,3 +41,22 @@ longer. Fair benchmarks say which one they measured.
 ## WSL2 virtual disk
 Linux on Windows (WSL2) does not see your NVMe directly. It sees one big file on C: (`ext4.vhdx`) that acts as a
 disk. It works well, but it adds a layer, so disk speeds measured in Linux are lower than the drive's rated 7 GB/s.
+
+## Memory bandwidth
+How many bytes per second the CPU can read from RAM. On this laptop we measured about **23 GB/s**, and it is
+reached already with 2 threads: more threads do not help. That is low for this CPU because the laptop has one
+memory module (one "channel"); two modules would give roughly twice as much. Example: chunking a 4 GiB buffer
+that is in RAM can never go faster than 4.3 GB ÷ 23 GB/s ≈ 0.19 s, however fast our code is.
+
+## L2 cache
+A small, very fast memory inside each CPU core: 1 MiB per core here. Data that fits in L2 can be read many times
+faster than from RAM. That is why we chunk and hash each 1 MiB block in one go (D5): the bytes come from RAM once.
+
+## O_DIRECT
+A way to read or write a file that skips Linux's file cache and talks to the disk directly. Disk-speed tests use
+it so we measure the disk, not RAM. Measured here: reads about **6 GB/s**, writes about **1.5–1.7 GB/s**.
+
+## Page cache copy
+A normal `read()` of a file that is already cached copies the bytes from Linux's cache into our program's buffer.
+That copy costs RAM bandwidth too. Measured here: 8 readers copy 9–13 GB/s out of the cache, before doing any work.
+So a "warm" backup cannot go faster than that unless it avoids the copy (for example with `mmap`).
