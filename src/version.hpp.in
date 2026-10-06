@@ -1,0 +1,5 @@
+#pragma once
+
+namespace dedup {
+inline constexpr const char* kVersion = "@PROJECT_VERSION@";
+}  // namespace dedup

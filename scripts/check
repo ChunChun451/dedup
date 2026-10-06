@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Run roadmap "done when" checks.
+#   scripts/check W01.2   -> runs checks/W01.2.sh
+#   scripts/check W01     -> runs every checks/W01.<digit>.sh in order
+# Exit code 0 only if every selected check passes.
+set -uo pipefail
+cd "$(dirname "$0")/.."
+export B=build/release
+
+if [[ $# -ne 1 || ! $1 =~ ^W[0-9]{2}(\.[0-9B])?$ ]]; then
+  echo "usage: scripts/check WNN | WNN.S" >&2
+  exit 2
+fi
+
+if [[ $1 == *.* ]]; then
+  files=("checks/$1.sh")
+else
+  shopt -s nullglob
+  files=(checks/"$1".[0-9].sh)
+fi
+if [[ ${#files[@]} -eq 0 || ! -f ${files[0]} ]]; then
+  echo "no checks found for $1" >&2
+  exit 2
+fi
+
+fail=0
+for f in "${files[@]}"; do
+  id=$(basename "$f" .sh)
+  log=$(mktemp)
+  if bash "$f" >"$log" 2>&1; then
+    echo "PASS $id"
+  else
+    echo "FAIL $id"
+    tail -n 20 "$log" | sed 's/^/    /'
+    fail=1
+  fi
+  rm -f "$log"
+done
+exit $fail
