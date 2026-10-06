@@ -176,6 +176,22 @@ run, which needs root. A root-owned helper that takes no arguments is the narrow
 the user cannot edit the file, and sudo refuses any extra arguments (the `""` in the rule).
 Example: `sudo -n /usr/local/sbin/dedup-drop-caches` works without a password, but `sudo -n ls` still asks for one.
 
+## D22 — dedup-gen: ChaCha20, 1 MiB independent blocks, integer-only, compiler-independent
+**Decision:** `tools/gen` generates D3/D4 data. Random bytes are a ChaCha20 keystream (RFC 8439 block function,
+checked against the RFC test vector) keyed by the seed. Text, structured (log lines) and mixed data are built in
+independent 1 MiB blocks, each driven by its own ChaCha20 stream (seed, mode, block number). Only integer math is
+used (Zipf weights 2³²/(r+1), no `pow`/`log`). Every random draw is its own statement. `mutate` makes edits of
+1–8192 bytes (insert/delete/overwrite, ⅓ each) at uniform gaps in [0, 2G), G = 4096.5 ÷ rate. Golden BLAKE3 hashes are
+in `tests/gen_golden_test.cpp`; `scripts/gen-crosscheck.sh` checks that a Clang build writes the same bytes as GCC.
+**Reason:** datasets must be identical on every machine and every rerun, or results are not comparable. Independent
+blocks give the same file with 1 or 16 threads (random data: 1.8 GB/s, as fast as the disk writes). ChaCha20 is
+standard and testable. Floating point and the order of draws inside one C++ expression can differ between compilers
+and libraries. That happened here: the first version's structured and mixed data differed between GCC and Clang,
+because `snprintf(…, rng.Below(…), rng.Below(…))` evaluates its arguments in an unspecified order. Edits of up to
+8 KiB, one per ~820 KB on average at 0.5%, touch a few percent of 16 KiB chunks, like real file updates. Spreading
+0.5% as single bytes would touch nearly every chunk. Measured zstd-1 ratios: random 1.00, text 2.76, structured 3.52,
+mixed 1.96. SPEC's "~3:1" for D3 was corrected to the measured ~2:1 (a description, not a target).
+
 ---
 
 ## G1 — Targets recalibrated to the measured limits (W01, 2026-10-06)

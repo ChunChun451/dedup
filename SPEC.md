@@ -43,7 +43,7 @@ with the reason in `docs/DECISIONS.md`. After that they are frozen. `bench/e2e/c
 | P2 | Fused chunk+hash, 16 threads, in memory | ≥ 15 GB/s |
 | P3a | Full pipeline, warm, null store, all-duplicate (files cache off) | ≥ 0.7 × warm re-read speed (`warm_read_8` median, measured in the same session) |
 | P3b | Same, unique incompressible (D4-small) | ≥ 5 GB/s |
-| P3c | Same, unique compressible (D3-small, ~3:1) | ≥ 2.5 GB/s |
+| P3c | Same, unique compressible (D3-small, ~2:1 with zstd level 1, measured at W02.1) | ≥ 2.5 GB/s |
 | P4a | Cold, real repo on the same disk, first backup D2/D4 | time ≤ 1.15 × `io_ceiling` time |
 | P4b | Cold, unchanged re-backup with files cache off | time ≤ 1.10 × read-only ceiling time |
 | P5a | Warm first backup vs fastest competitor (defaults), every dataset | ≥ min(3 × fastest competitor, 0.87 × warm ceiling throughput) |
@@ -77,7 +77,7 @@ data are bound by the disk's write speed `W` (~1.8 GB/s), for every tool.
 |---|---|---|---|
 | D1 | Linux kernel trees v6.0…v6.12 (13 trees, cdn.kernel.org tarballs) | ~17 GB, ~1M files | Small files, many versions |
 | D2 | 10 Debian 13 `genericcloud` raw daily images | ~20 GB | Large files, VM-image dedup |
-| D3 | `dedup-gen` mixed (50% text-like, 25% structured, 25% random), base + 2 versions at 0.5% edits | 3 × 16 GiB | Controlled shift resistance and compressibility |
+| D3 | `dedup-gen` mixed (50% text-like, 25% structured, 25% random; zstd-1 ratio 1.96:1), base + 2 versions at 0.5% edits | 3 × 16 GiB | Controlled shift resistance and compressibility |
 | D4 | `dedup-gen` random (ChaCha20, seed 4) | 32 GiB | Incompressible, I/O-bound, defeats caches |
 | *-small | D1 one tree; D3/D4 at 4 GiB | ≤ 4 GiB | Warm-cache runs |
 Only scripts and sha256 manifests are in git. At most one competitor repo exists at a time.

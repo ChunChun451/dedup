@@ -18,6 +18,8 @@ add_executable(dedup src/main.cpp)
 target_include_directories(dedup PRIVATE ${CMAKE_BINARY_DIR}/generated)
 target_link_libraries(dedup PRIVATE dedup_warnings)
 
+add_subdirectory(tools/gen)
+
 enable_testing()
 add_subdirectory(tests)
 add_subdirectory(bench/micro)
